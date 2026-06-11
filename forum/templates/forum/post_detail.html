@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ post.title }} - Форум</title>
+    <!-- Подключаем Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <style>
+        body { background-color: #f8f9fa; }
+        
+        /* Стили для текста самого поста */
+        .post-content {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            color: #212529;
+        }
+
+        /* Делаю форму комментария красивой */
+        form p { margin-bottom: 1rem; }
+        form p label { display: none; }
+        form p textarea {
+            display: block;
+            width: 100%;
+            padding: 0.75rem;
+            font-size: 1rem;
+            color: #212529;
+            background-color: #fff;
+            border: 1px solid #ced4da;
+            border-radius: 0.5rem;
+            min-height: 100px;
+            transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
+        }
+        form p textarea:focus {
+            border-color: #86b7fe;
+            outline: 0;
+            box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container mt-4 pb-5">
+    
+    <a href="/" class="text-decoration-none text-secondary mb-3 d-inline-block">
+        &larr; На главную
+    </a>
+
+    <!-- Разделяю экран на две колонки -->
+    <div class="row">
+        
+        <!-- ЛЕВАЯ КОЛОНКА: Пост и комментарии -->
+        <div class="col-lg-8">
+
+            <!--  ОСНОВНОЙ ПОСТ  -->
+            <div class="card shadow-sm border-0 mb-5">
+                <div class="card-body p-4 p-sm-5">
+                    
+                    <h1 class="card-title fw-bold mb-3">
+                        {{ post.title }}
+                    </h1>
+
+                    <div class="d-flex align-items-center text-muted small mb-4 pb-3 border-bottom">
+                        <span class="me-3">👤 <strong>{{ post.author.username }}</strong></span>
+                        <span>🕒 {{ post.created_at|date:"d.m.Y H:i" }}</span>
+                    </div>
+
+                    <!-- Текст поста -->
+                    <div class="post-content mb-4">
+                        {{ post.content|linebreaks }}
+                    </div>
+
+                    {% if user == post.author %}
+                        <div class="d-flex justify-content-end gap-2 pt-3 border-top mt-4">
+                            <a href="/post/{{ post.id }}/edit/" class="btn btn-outline-warning btn-sm">
+                                ✏️ Редактировать
+                            </a>
+                            <a href="/post/{{ post.id }}/delete/" class="btn btn-outline-danger btn-sm">
+                                🗑️ Удалить
+                            </a>
+                        </div>
+                    {% endif %}
+
+                </div>
+            </div>
+
+            <!--  КОММЕНТАРИИ -->
+            <h4 class="mb-4 fw-bold">Комментарии <span class="text-muted fs-6 fw-normal">({{ comments|length }})</span></h4>
+
+            <div class="mb-5">
+                {% for comment in comments %}
+                    <div class="card border-0 shadow-sm mb-3 border-start border-primary border-4">
+                        <div class="card-body py-3">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <span class="fw-bold">
+                                    {{ comment.author.username }}
+                                    <!-- Плашка автора темы -->
+                                    {% if comment.author == post.author %}
+                                        <span class="badge bg-info text-dark ms-2 small">Автор темы</span>
+                                    {% endif %}
+                                </span>
+                                <small class="text-muted">{{ comment.created_at|date:"d.m.Y H:i" }}</small>
+                            </div>
+                            <!-- Фикс отступов в комментах -->
+                            <div class="mb-0 text-secondary">
+                                {{ comment.content|linebreaks }}
+                            </div>
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="alert alert-light text-center text-muted border border-dashed py-4 shadow-sm">
+                        💬 Комментариев пока нет. Напишите первым!
+                    </div>
+                {% endfor %}
+            </div>
+
+            <!--  ФОРМА КОММЕНТАРИЯ  -->
+            <div class="card shadow-sm border-0 bg-light mb-4">
+                <div class="card-body p-4">
+                    <h5 class="mb-3">Написать комментарий</h5>
+                    {% if user.is_authenticated %}
+                        <form method="post">
+                            {% csrf_token %}
+                            {{ form.as_p }}
+                            <div class="text-end">
+                                <button type="submit" class="btn btn-primary px-4 fw-bold shadow-sm">
+                                    Отправить
+                                </button>
+                            </div>
+                        </form>
+                    {% else %}
+                        <div class="text-center py-3">
+                            <p class="text-muted mb-3">Чтобы оставить комментарий, необходимо войти в аккаунт.</p>
+                            <a href="/login/" class="btn btn-outline-primary me-2">Войти</a>
+                            <a href="/register/" class="btn btn-success">Регистрация</a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ПРАВАЯ КОЛОНКА: ИИ-Помощник (как на главной) -->
+        <div class="col-lg-4 mt-4 mt-lg-0">
+            <div class="card shadow-sm border-0 sticky-top" style="top: 20px;">
+                <div class="card-header bg-dark text-white d-flex align-items-center">
+                    <span class="fs-5 me-2">🤖</span> 
+                    <strong>Нейро-помощник</strong>
+                </div>
+                
+                <div class="card-body bg-light" style="height: 400px; overflow-y: auto;" id="chatBox">
+                    <!-- Сообщение по умолчанию (оно будет стерто, если есть история) -->
+                    <div class="mb-3" id="welcomeMsg">
+                        <div class="text-muted small mb-1">Ассистент</div>
+                        <div class="p-2 bg-white border rounded shadow-sm d-inline-block">
+                            Привет! Я ИИ-помощник этого форума. Я помню наш разговор!
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-footer bg-white">
+                    <div class="input-group">
+                        <input type="text" id="aiInput" class="form-control" placeholder="Спросить ИИ...">
+                        <button class="btn btn-primary" id="sendBtn" type="button">Отправить</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!--  СКРИПТ ИИ  -->
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const chatBox = document.getElementById('chatBox');
+    const sendBtn = document.getElementById('sendBtn');
+    const input = document.getElementById('aiInput');
+
+    // 1. ЗАГРУЗКА ПАМЯТИ: Проверка, есть ли сохраненный чат в sessionStorage
+    const savedChat = sessionStorage.getItem('forumAiHistory');
+    if (savedChat) {
+        chatBox.innerHTML = savedChat; // Восстанавливаем весь чат
+        
+        // Очищаем индикаторы загрузки (если юзер перешел на другую страницу, пока ИИ думал)
+        const stuckLoaders = chatBox.querySelectorAll('.loading-indicator');
+        stuckLoaders.forEach(loader => loader.remove());
+        
+        chatBox.scrollTop = chatBox.scrollHeight; // Прокручиваем вниз
+    }
+
+    // Функция сохранения чата в память
+    function saveChat() {
+        sessionStorage.setItem('forumAiHistory', chatBox.innerHTML);
+    }
+
+    // Отправка сообщения
+    sendBtn.addEventListener('click', async function() {
+        const text = input.value.trim();
+        if (!text) return;
+
+        // Показы сообщения юзера
+        chatBox.innerHTML += `
+            <div class="mb-3 text-end">
+                <div class="text-muted small mb-1">Вы</div>
+                <div class="p-2 bg-primary text-white border rounded shadow-sm d-inline-block text-start">
+                    ${text}
+                </div>
+            </div>`;
+        
+        input.value = '';
+        chatBox.scrollTop = chatBox.scrollHeight;
+        saveChat(); // Сохраняем шаг в память
+
+        // Показываем загрузку
+        const loadingId = 'loading-' + Date.now();
+        chatBox.innerHTML += `
+            <div class="mb-3 loading-indicator" id="${loadingId}">
+                <div class="text-muted small mb-1">Ассистент</div>
+                <div class="p-2 bg-white border rounded shadow-sm d-inline-block text-muted">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    Думаю...
+                </div>
+            </div>`;
+        chatBox.scrollTop = chatBox.scrollHeight;
+        sendBtn.disabled = true;
+        saveChat(); // Сохраняем шаг в память
+
+        try {
+            // Отправляем запрос
+            const response = await fetch('/ask-ai/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: text })
+            });
+
+            const data = await response.json();
+            
+            // Удаляем загрузку
+            const loaderElement = document.getElementById(loadingId);
+            if(loaderElement) loaderElement.remove();
+
+            // Показываем ответ ИИ
+            chatBox.innerHTML += `
+            <div class="mb-3">
+                <div class="text-muted small mb-1">Ассистент ✨</div>
+                <div class="p-2 bg-white border rounded shadow-sm d-inline-block">
+                    ${data.reply}
+                </div>
+            </div>`;
+
+        } catch (error) {
+            const loaderElement = document.getElementById(loadingId);
+            if(loaderElement) loaderElement.remove();
+            
+            chatBox.innerHTML += `
+            <div class="mb-3">
+                <div class="text-muted small mb-1">Ассистент</div>
+                <div class="p-2 bg-danger text-white border rounded shadow-sm d-inline-block">
+                    Ошибка связи с сервером.
+                </div>
+            </div>`;
+        }
+
+        sendBtn.disabled = false;
+        chatBox.scrollTop = chatBox.scrollHeight;
+        saveChat(); // Финальное сохранение с ответом
+    });
+
+    // Отправка по Enter
+    input.addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') { sendBtn.click(); }
+    });
+});
+</script>
+
+</body>
+</html>
